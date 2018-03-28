@@ -1,6 +1,7 @@
 package azuremonitor
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -11,11 +12,51 @@ import (
 type AzureInstanceMetadata struct {
 }
 
+// VirtualMachineMetadata contains information about a VM from the metadata service
 type VirtualMachineMetadata struct {
+	Raw             string
+	AzureResourceID string
+	Compute         struct {
+		Location             string `json:"location"`
+		Name                 string `json:"name"`
+		Offer                string `json:"offer"`
+		OsType               string `json:"osType"`
+		PlacementGroupID     string `json:"placementGroupId"`
+		PlatformFaultDomain  string `json:"platformFaultDomain"`
+		PlatformUpdateDomain string `json:"platformUpdateDomain"`
+		Publisher            string `json:"publisher"`
+		ResourceGroupName    string `json:"resourceGroupName"`
+		Sku                  string `json:"sku"`
+		SubscriptionID       string `json:"subscriptionId"`
+		Tags                 string `json:"tags"`
+		Version              string `json:"version"`
+		VMID                 string `json:"vmId"`
+		VMScaleSetName       string `json:"vmScaleSetName"`
+		VMSize               string `json:"vmSize"`
+		Zone                 string `json:"zone"`
+	} `json:"compute"`
+	Network struct {
+		Interface []struct {
+			Ipv4 struct {
+				IPAddress []struct {
+					PrivateIPAddress string `json:"privateIpAddress"`
+					PublicIPAddress  string `json:"publicIpAddress"`
+				} `json:"ipAddress"`
+				Subnet []struct {
+					Address string `json:"address"`
+					Prefix  string `json:"prefix"`
+				} `json:"subnet"`
+			} `json:"ipv4"`
+			Ipv6 struct {
+				IPAddress []interface{} `json:"ipAddress"`
+			} `json:"ipv6"`
+			MacAddress string `json:"macAddress"`
+		} `json:"interface"`
+	} `json:"network"`
 }
 
 const (
-	url = "http://169.254.169.254/metadata/instance?api-version=2017-08-01&format=json"
+	url = "http://169.254.169.254/metadata/instance?api-version=2017-12-01"
 )
 
 func (s *AzureInstanceMetadata) GetInstanceMetadata() (*VirtualMachineMetadata, error) {
@@ -46,6 +87,10 @@ func (s *AzureInstanceMetadata) GetInstanceMetadata() (*VirtualMachineMetadata, 
 			resp.StatusCode, resp.Status, reply)
 	}
 
-	fmt.Printf("%s\n", reply)
-	return nil, nil
+	var metadata VirtualMachineMetadata
+	if err := json.Unmarshal(reply, &metadata); err != nil {
+		return nil, err
+	}
+
+	return &metadata, nil
 }
