@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -12,11 +13,12 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/influxdata/telegraf"
-	"github.com/influxdata/telegraf/plugins/outputs"
-
 	"strings"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/influxdata/telegraf"
+	"github.com/influxdata/telegraf/plugins/outputs"
 )
 
 // LogAnalytics is the configuration structure for the output plugin
@@ -85,15 +87,12 @@ func (s *LogAnalytics) Close() error {
 // Write writes metrics to the remote endpoint
 func (s *LogAnalytics) Write(metrics []telegraf.Metric) error {
 	// Flatten metrics into a log-analytics compatible format
-
-	json, err := s.flattenMetrics(metrics)
+	jsonBytes, err := s.flattenMetrics(metrics)
 	if err != nil {
 		log.Printf("Error translating metrics %s", err)
 		return err
 	}
 
-	// TODO - do we really need to convert to byte array for this?
-	jsonBytes := []byte(json)
 	err = s.postData(&jsonBytes, s.LogName)
 	if err != nil {
 		log.Printf("Error publishing metrics %s", err)
@@ -103,13 +102,89 @@ func (s *LogAnalytics) Write(metrics []telegraf.Metric) error {
 	return nil
 }
 
-func (s *LogAnalytics) flattenMetrics(metrics []telegraf.Metric) (string, error) {
+func (s *LogAnalytics) flattenMetrics(metrics []telegraf.Metric) ([]byte, error) {
+	var events []map[string]string
+
 	for _, metric := range metrics {
+		timestamp := metric.Time()
+
+		// fmt.Printf("metric:\n")
+		// spew.Dump(metric)
+		// fmt.Printf("value type is %v\n", metric.Type())
+
+		// for tagName, tagValue := range metric.Tags() {
+		// 	fmt.Printf("tag name %s = %s:\n", tagName, tagValue)
+		// }
+
+		instance := ""
+
+		for fieldName, fieldValue := range metric.Fields() {
+
+			//spew.Printf("field name %s == %v\n", fieldName, fieldValue)
+
+			val := 0.0
+
+			switch v := fieldValue.(type) {
+			case int:
+				val = float64(v)
+			case int8:
+				val = float64(v)
+			case int16:
+				val = float64(v)
+			case int32:
+				val = float64(v)
+			case int64:
+				val = float64(v)
+			case float32:
+				val = float64(v)
+			case float64:
+				val = v
+			default:
+				spew.Printf("field is of unsupported value type %v\n", v)
+			}
+
+			// TODO - change this to a map[string]string to make it easier to handle
+			// arbitrary key/value pairs
+			event := map[string]string{
+				"timestamp": timestamp.Format(time.RFC3339),
+				"hostname":  metric.Tags()["host"],
+				"category":  metric.Name(),
+				"instance":  instance,
+				"metric":    fieldName,
+				"value":     strconv.FormatFloat(val, 'f', -1, 64),
+			}
+
+			//		spew.Dump(event)
+
+			events = append(events, event)
+
+			// diskio,name=disk3,host=Marks-MacBook-Pro.local
+			// read_bytes=1309561856i,read_time=14892i,weighted_io_time=0i,
+			// iops_in_progress=0i,reads=1501i,writes=0i,write_bytes=0i,write_time=0i,
+			// io_time=14892i 1522211440000000000
+
+		}
 		// write `metric` to the output sink here
-		fmt.Printf("%s\n", metric)
 	}
 
-	return "", nil
+	jsonString, err := json.Marshal(events)
+	if err != nil {
+		fmt.Printf("Error in json converstion %s\n", err)
+	}
+
+	// spew.Dump(events)
+	// fmt.Printf("Marshalled event as\n%s", jsonString)
+
+	return jsonString, nil
+}
+
+type metricRecord struct {
+	Timestamp time.Time `json:"timestamp"`
+	Hostname  string    `json:"hostname"`
+	Category  string    `json:"category"`
+	Instance  string    `json:"instance"`
+	Metric    string    `json:"metric"`
+	Value     float64   `json:"value"`
 }
 
 func init() {
@@ -162,6 +237,9 @@ func (s *LogAnalytics) postData(msg *[]byte, logType string) error {
 	req.Header.Set("Log-Type", logType)
 	req.Header["x-ms-date"] = []string{rfc1123date}
 	req.Header.Set("Content-Type", "application/json")
+
+	spew.Dump(signature)
+	spew.Dump(req)
 
 	client := http.Client{
 		Timeout: s.HTTPPostTimeout,
