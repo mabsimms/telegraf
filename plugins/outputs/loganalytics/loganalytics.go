@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -23,9 +24,10 @@ import (
 
 // LogAnalytics is the configuration structure for the output plugin
 type LogAnalytics struct {
-	Workspace       string `toml:"workspace"`
-	SharedKey       string `toml:"sharedkey"`
-	LogName         string `toml:"logname"`
+	Workspace       string   `toml:"workspace"`
+	SharedKey       string   `toml:"sharedkey"`
+	LogName         string   `toml:"logname"`
+	IncludeTags     []string `toml:"includeTags"`
 	URL             string
 	HTTPPostTimeout time.Duration
 }
@@ -37,6 +39,8 @@ workspace = "$OMS_WORKSPACE"
 ## The shared key of the workspace for your log analytics instance
 ## Recommended to pull this from an environment varaible
 sharedKey = "$OMS_KEY"
+## The set of tags to include in the output records
+includeTags = [ "host", dc" ] # optional.
 `
 
 // Description provides a description of the plugin
@@ -60,6 +64,10 @@ func (s *LogAnalytics) Connect() error {
 	// Validate the configuration
 	if s.SharedKey == "" || s.Workspace == "" {
 		return fmt.Errorf("Log analytics workspace or shared key not defined")
+	}
+
+	if s.LogName == "" {
+		return fmt.Errorf("Log analytics log name not defined")
 	}
 
 	s.URL = "https://" + s.Workspace + ".ods.opinsights.azure.com" + resource + "?api-version=2016-04-01"
@@ -107,21 +115,17 @@ func (s *LogAnalytics) flattenMetrics(metrics []telegraf.Metric) ([]byte, error)
 
 	for _, metric := range metrics {
 		timestamp := metric.Time()
-
-		// fmt.Printf("metric:\n")
-		// spew.Dump(metric)
-		// fmt.Printf("value type is %v\n", metric.Type())
-
-		// for tagName, tagValue := range metric.Tags() {
-		// 	fmt.Printf("tag name %s = %s:\n", tagName, tagValue)
-		// }
-
 		instance := ""
 
+		// Pull out the tag array
+		taglist := make(map[string]string)
+		for _, tagName := range s.IncludeTags {
+			if val, ok := metric.Tags()[tagName]; ok {
+				taglist[tagName] = val
+			}
+		}
+
 		for fieldName, fieldValue := range metric.Fields() {
-
-			//spew.Printf("field name %s == %v\n", fieldName, fieldValue)
-
 			val := 0.0
 
 			switch v := fieldValue.(type) {
@@ -143,37 +147,26 @@ func (s *LogAnalytics) flattenMetrics(metrics []telegraf.Metric) ([]byte, error)
 				spew.Printf("field is of unsupported value type %v\n", v)
 			}
 
-			// TODO - change this to a map[string]string to make it easier to handle
-			// arbitrary key/value pairs
 			event := map[string]string{
 				"timestamp": timestamp.Format(time.RFC3339),
-				"hostname":  metric.Tags()["host"],
 				"category":  metric.Name(),
 				"instance":  instance,
 				"metric":    fieldName,
 				"value":     strconv.FormatFloat(val, 'f', -1, 64),
 			}
 
-			//		spew.Dump(event)
+			for tagName, tagValue := range taglist {
+				event[tagName] = tagValue
+			}
 
 			events = append(events, event)
-
-			// diskio,name=disk3,host=Marks-MacBook-Pro.local
-			// read_bytes=1309561856i,read_time=14892i,weighted_io_time=0i,
-			// iops_in_progress=0i,reads=1501i,writes=0i,write_bytes=0i,write_time=0i,
-			// io_time=14892i 1522211440000000000
-
 		}
-		// write `metric` to the output sink here
 	}
 
 	jsonString, err := json.Marshal(events)
 	if err != nil {
 		fmt.Printf("Error in json converstion %s\n", err)
 	}
-
-	// spew.Dump(events)
-	// fmt.Printf("Marshalled event as\n%s", jsonString)
 
 	return jsonString, nil
 }
@@ -238,8 +231,8 @@ func (s *LogAnalytics) postData(msg *[]byte, logType string) error {
 	req.Header["x-ms-date"] = []string{rfc1123date}
 	req.Header.Set("Content-Type", "application/json")
 
-	spew.Dump(signature)
-	spew.Dump(req)
+	//spew.Dump(signature)
+	//spew.Dump(req)
 
 	client := http.Client{
 		Timeout: s.HTTPPostTimeout,
@@ -251,7 +244,14 @@ func (s *LogAnalytics) postData(msg *[]byte, logType string) error {
 
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 || resp.StatusCode < 200 {
-		return fmt.Errorf("Post Error. HTTP response code:%d message:%s", resp.StatusCode, resp.Status)
+		var reply []byte
+		reply, err = ioutil.ReadAll(resp.Body)
+
+		if err != nil {
+			reply = nil
+		}
+		return fmt.Errorf("Post Error. HTTP response code:%d message:%s reply:\n%s",
+			resp.StatusCode, resp.Status, reply)
 	}
 	return nil
 }
