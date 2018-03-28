@@ -1,10 +1,8 @@
 package azuremonitor
 
 import (
-	"strconv"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/influxdata/telegraf"
 )
 
@@ -128,24 +126,24 @@ func (s *AzureMonitor) flattenMetrics(metrics []telegraf.Metric) ([]azureMonitor
 func (s *AzureMonitor) formatField(value interface{}) string {
 	var ret string
 
-	switch v := value.(type) {
-	case int:
-		ret = strconv.FormatInt(value(int), 10)
-	case int8:
-		ret = strconv.FormatInt(v.(int8), 10)
-	case int16:
-		ret = strconv.FormatInt(v.(int16), 10)
-	case int32:
-		ret = strconv.FormatInt(v.(int32), 10)
-	case int64:
-		ret = strconv.FormatInt(v.(int64), 10)
-	case float32:
-		ret = strconv.FormatFloat(v.(float32), 'f', -1, 64)
-	case float64:
-		ret = strconv.FormatFloat(v.(float64), 'f', -1, 64)
-	default:
-		spew.Printf("field is of unsupported value type %v\n", v)
-	}
+	// switch v := value.(type) {
+	// case int:
+	// 	ret = strconv.FormatInt(value.(int), 10)
+	// case int8:
+	// 	ret = strconv.FormatInt(v.(int8), 10)
+	// case int16:
+	// 	ret = strconv.FormatInt(v.(int16), 10)
+	// case int32:
+	// 	ret = strconv.FormatInt(v.(int32), 10)
+	// case int64:
+	// 	ret = strconv.FormatInt(v.(int64), 10)
+	// case float32:
+	// 	ret = strconv.FormatFloat(v.(float32), 'f', -1, 64)
+	// case float64:
+	// 	ret = strconv.FormatFloat(v.(float64), 'f', -1, 64)
+	// default:
+	// 	spew.Printf("field is of unsupported value type %v\n", v)
+	// }
 	return ret
 }
 
