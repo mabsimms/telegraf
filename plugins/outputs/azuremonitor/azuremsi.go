@@ -7,29 +7,48 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+	"strconv"
 )
 
 // MsiToken is the managed service identity token
 type MsiToken struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
-	ExpiresIn    int64  `json:"expires_in"`
-	ExpiresOn    int64  `json:"expires_on"`
-	NotBefore    int64  `json:"not_before"`
+	ExpiresIn    string  `json:"expires_in"`
+	ExpiresOn    string  `json:"expires_on"`
+	NotBefore    string  `json:"not_before"`
 	Resource     string `json:"resource"`
 	TokenType    string `json:"token_type"`
+
+	expiresAt    time.Time
+	notBefore    time.Time
+}
+
+func (m *MsiToken) parseTimes() {
+	val, err := strconv.ParseInt(m.ExpiresOn, 10, 64)
+	if err == nil {
+		m.expiresAt = time.Unix(val, 0)
+	}
+
+	val, err = strconv.ParseInt(m.NotBefore, 10, 64)
+	if err == nil {
+		m.notBefore = time.Unix(val, 0)
+	}
+}
+
+func (m *MsiToken) ExpiresAt() time.Time { 
+	return m.expiresAt
 }
 
 // ExpiresInDuration returns the duration until the token expires
 func (m *MsiToken) ExpiresInDuration() time.Duration {
-	expiresOn := time.Unix(m.ExpiresOn, 0)
-	expiresDuration := time.Now().UTC().Sub(expiresOn)
+	expiresDuration := m.expiresAt.Sub(time.Now().UTC())
 	return expiresDuration
 }
 
 // NotBeforeTime returns the time at which the token becomes valid
 func (m *MsiToken) NotBeforeTime() time.Time {
-	return time.Unix(m.NotBefore, 0)
+	return m.notBefore
 }
 
 // MsiTokenClient is the client for accessing and validating MSI tokens
@@ -83,6 +102,7 @@ func (s *MsiTokenClient) GetMsiToken() (*MsiToken, error) {
 	if err := json.Unmarshal(reply, &token); err != nil {
 		return nil, err
 	}
+	token.parseTimes()
 
 	return &token, nil
 }

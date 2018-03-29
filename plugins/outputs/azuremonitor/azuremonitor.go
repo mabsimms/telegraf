@@ -38,7 +38,7 @@ var sampleConfig = `
 ## of the VM via the instance metadata service (optional if running 
 ## on an Azure VM with MSI)
 resourceId = "/subscriptions/3e9c2afc-52b3-4137-9bba-02b6eb204331/resourceGroups/someresourcegroup-rg/providers/Microsoft.Compute/virtualMachines/somevmname"
-## Azure region to publish metrics against.  Defaults to useast
+## Azure region to publish metrics against.  Defaults to eastus
 region = "useast"
 ## Maximum duration to wait for HTTP post (in seconds).  Defaults to 15
 httpPostTimeout = 15
@@ -79,9 +79,6 @@ func (s *AzureMonitor) Connect() error {
 		return fmt.Errorf("Must provide values for azureSubscription, azureTenant, azureClient and azureClientSecret, or leave all blank to default to MSI")
 	}
 
-	if s.Region == "" {
-		s.Region = azureMonitorDefaultRegion
-	}
 
 	if s.HTTPPostTimeout == 0 {
 		s.HTTPPostTimeout = 10
@@ -95,6 +92,14 @@ func (s *AzureMonitor) Connect() error {
 			return fmt.Errorf("No resource id specified, and Azure Instance metadata service not available.  If not running on an Azure VM, provide a value for resourceId")
 		}
 		s.ResourceID = metadata.AzureResourceID
+
+		if s.Region == "" {
+			s.Region = metadata.Compute.Location
+		}
+	}
+
+	if s.Region == "" {
+		s.Region = azureMonitorDefaultRegion
 	}
 
 	// Validate credentials
@@ -268,7 +273,7 @@ func (s *AzureMonitor) formatField(value interface{}) string {
 }
 
 func (s *AzureMonitor) postData(msg *[]byte) error {
-	metricsEndpoint := fmt.Sprintf("https://%s.monitoring.azure.com/%s/metrics",
+	metricsEndpoint := fmt.Sprintf("https://%s.monitoring.azure.com%s/metrics",
 		s.Region, s.ResourceID)
 
 	req, err := http.NewRequest("POST", metricsEndpoint, bytes.NewBuffer(*msg))
