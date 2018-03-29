@@ -116,17 +116,18 @@ func (s *AzureInstanceMetadata) GetMsiToken(clientID string, resourceID string) 
 		return nil, err
 	}
 
+	// Resource ID defaults to https://management.azure.com
+	if resourceID == "" {
+		resourceID = "https://management.azure.com"
+	}
+
 	msiParameters := url.Values{}
 	msiParameters.Add("resource", "https://management.azure.com/")
+	msiParameters.Add("api-version", "2018-02-01")
 
 	// Client id is optional
 	if clientID != "" {
 		msiParameters.Add("client_id", clientID)
-	}
-
-	// Resource ID defaults to https://management.azure.com
-	if resourceID == "" {
-		resourceID = "https://management.azure.com"
 	}
 
 	msiEndpoint.RawQuery = msiParameters.Encode()
@@ -148,14 +149,14 @@ func (s *AzureInstanceMetadata) GetMsiToken(clientID string, resourceID string) 
 	// Complete reading the body
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= 300 || resp.StatusCode < 200 {
-		return nil, fmt.Errorf("Post Error. HTTP response code:%d message:%s",
-			resp.StatusCode, resp.Status)
-	}
-
 	reply, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
+	}
+
+	if resp.StatusCode >= 300 || resp.StatusCode < 200 {
+		return nil, fmt.Errorf("Post Error. HTTP response code:%d message:%s, content: %s",
+			resp.StatusCode, resp.Status, reply)
 	}
 
 	var token MsiToken
@@ -169,7 +170,7 @@ func (s *AzureInstanceMetadata) GetMsiToken(clientID string, resourceID string) 
 
 const (
 	vmInstanceMetadataURL  = "http://169.254.169.254/metadata/instance?api-version=2017-12-01"
-	msiInstanceMetadataURL = "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01"
+	msiInstanceMetadataURL = "http://169.254.169.254/metadata/identity/oauth2/token"
 )
 
 // GetInstanceMetadata retrieves metadata about the current Azure VM
