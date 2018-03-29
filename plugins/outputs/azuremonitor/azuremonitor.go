@@ -289,14 +289,14 @@ func (s *AzureMonitor) formatField(value interface{}) string {
 	return ret
 }
 
-func (s *AzureMonitor) postData(msg *[]byte) error {
+func (s *AzureMonitor) postData(msg *[]byte) (*http.Request, error) {
 	metricsEndpoint := fmt.Sprintf("https://%s.monitoring.azure.com%s/metrics",
 		s.Region, s.ResourceID)
 
 	req, err := http.NewRequest("POST", metricsEndpoint, bytes.NewBuffer(*msg))
 	if err != nil {
 		log.Printf("Error creating HTTP request")
-		return err
+		return nil, err
 	}
 
 	req.Header.Set("Authorization", "Bearer: "+s.bearerToken)
@@ -309,7 +309,7 @@ func (s *AzureMonitor) postData(msg *[]byte) error {
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return req, err
 	}
 
 	defer resp.Body.Close()
@@ -320,8 +320,8 @@ func (s *AzureMonitor) postData(msg *[]byte) error {
 		if err != nil {
 			reply = nil
 		}
-		return fmt.Errorf("Post Error. HTTP response code:%d message:%s reply:\n%s",
+		return req, fmt.Errorf("Post Error. HTTP response code:%d message:%s reply:\n%s",
 			resp.StatusCode, resp.Status, reply)
 	}
-	return nil
+	return req, nil
 }
