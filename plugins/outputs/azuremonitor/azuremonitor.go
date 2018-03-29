@@ -86,7 +86,7 @@ func (s *AzureMonitor) Connect() error {
 
 	if s.useMsi == false {
 		// If using direct AD authentication create the AD access client
-		oauthConfig, err = adal.NewOAuthConfig(azure.PublicCloud.ActiveDirectoryEndpoint, s.AzureTenantID)
+		oauthConfig, err := adal.NewOAuthConfig(azure.PublicCloud.ActiveDirectoryEndpoint, s.AzureTenantID)
 		if err != nil {
 			return fmt.Errorf("Could not initialize AD client: %s", err)
 		}
@@ -178,7 +178,7 @@ func (s *AzureMonitor) validateCredentials() error {
 		// Otherwise directory acquire a token
 	} else {
 		adToken, err := adal.NewServicePrincipalToken(
-			s.oauthConfig, s.AzureClientID, s.AzureClientSecret,
+			*(s.oauthConfig), s.AzureClientID, s.AzureClientSecret,
 			azure.PublicCloud.ActiveDirectoryEndpoint)
 		if err != nil {
 			return fmt.Errorf("Could not acquire ADAL token: %s", err)
