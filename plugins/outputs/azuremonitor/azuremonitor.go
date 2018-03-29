@@ -16,13 +16,20 @@ import (
 
 // AzureMonitor allows publishing of metrics to the Azure Monitor custom metrics service
 type AzureMonitor struct {
-	ResourceID       string `json:"resourceId"`
-	Region           string `json:"region"`
-	HTTPPostTimeout  int    `json:"httpPostTimeout"`
+	ResourceID          string `toml:"resourceId"`
+	Region              string `toml:"region"`
+	HTTPPostTimeout     int    `toml:"httpPostTimeout"`
+	AzureSubscriptionID string `toml:"azureSubscription"`
+	AzureTenantID       string `toml:"azureTenant"`
+	AzureClientID       string `toml:"azureClient"`
+	AzureClientSecret   string `toml:"azureClientSecret"`
+
+	useMsi           bool
 	instanceMetadata *VirtualMachineMetadata
 	msiToken         *MsiToken
 	msiTokenClient   *MsiTokenClient
 	bearerToken      string
+	expiryWatermark  time.Duration
 }
 
 var sampleConfig = `
@@ -35,7 +42,21 @@ resourceId = "/subscriptions/3e9c2afc-52b3-4137-9bba-02b6eb204331/resourceGroups
 region = "useast"
 ## Maximum duration to wait for HTTP post (in seconds).  Defaults to 15
 httpPostTimeout = 15
+## Whether or not to use managed service identity (defaults to true).
+useManagedServiceIdentity = true
+## TODO
+azureSubscription = "TODO"
+## TODO 
+azureTenant = "TODO"
+## TODO
+azureClient = "TODO"
+## TODO
+azureClientSecret = "TODO"
 `
+
+const (
+	azureMonitorDefaultRegion = "eastus"
+)
 
 // Description provides a description of the plugin
 func (s *AzureMonitor) Description() string {
@@ -49,6 +70,39 @@ func (s *AzureMonitor) SampleConfig() string {
 
 // Connect initializes the plugin and validates connectivity
 func (s *AzureMonitor) Connect() error {
+	// Set defaults
+
+	// If no direct AD values provided, fall back to MSI
+	if s.AzureSubscriptionID == "" && s.AzureTenantID == "" && s.AzureClientID == "" && s.AzureClientSecret == "" {
+		s.useMsi = true
+	} else if s.AzureSubscriptionID == "" || s.AzureTenantID == "" || s.AzureClientID == "" || s.AzureClientSecret == "" {
+		return fmt.Errorf("Must provide values for azureSubscription, azureTenant, azureClient and azureClientSecret, or leave all blank to default to MSI")
+	}
+
+	if s.Region == "" {
+		s.Region = azureMonitorDefaultRegion
+	}
+
+	if s.HTTPPostTimeout == 0 {
+		s.HTTPPostTimeout = 10
+	}
+
+	// Validate the resource identifier
+	if s.ResourceID == "" {
+		metadataClient := &AzureInstanceMetadata{}
+		metadata, err := metadataClient.GetInstanceMetadata()
+		if err != nil {
+			return fmt.Errorf("No resource id specified, and Azure Instance metadata service not available.  If not running on an Azure VM, provide a value for resourceId")
+		}
+		s.ResourceID = metadata.AzureResourceID
+	}
+
+	// Validate credentials
+	err := s.validateCredentials()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -60,12 +114,6 @@ func (s *AzureMonitor) Close() error {
 
 // Write writes metrics to the remote endpoint
 func (s *AzureMonitor) Write(metrics []telegraf.Metric) error {
-	// Validate that we have a resource ID to be able to write against
-	err := s.validateResourceID()
-	if err != nil {
-		return err
-	}
-
 	// Flatten metrics into an Azure Monitor common schema compatible format
 	metricsList, err := s.flattenMetrics(metrics)
 	if err != nil {
@@ -84,8 +132,20 @@ func (s *AzureMonitor) Write(metrics []telegraf.Metric) error {
 }
 
 func (s *AzureMonitor) validateCredentials() error {
-	// TODO - config for MSI
-	if true {
+	// Use managed service identity
+	if s.useMsi {
+		// Check expiry on the token
+		if s.msiToken != nil {
+			expiryDuration := s.msiToken.ExpiresInDuration()
+			if expiryDuration > s.expiryWatermark {
+				return nil
+			}
+
+			// Token is about to expire
+			log.Printf("Bearer token expiring in %s; acquiring new token\n", expiryDuration.String())
+			s.msiToken = nil
+		}
+
 		if s.msiTokenClient == nil {
 			s.msiTokenClient = &MsiTokenClient{}
 		}
@@ -96,36 +156,18 @@ func (s *AzureMonitor) validateCredentials() error {
 			if err != nil {
 				return err
 			}
+			log.Printf("Bearer token acquired; expiring in %s\n", msiToken.ExpiresInDuration().String())
 			s.bearerToken = msiToken.AccessToken
-		} else if true {
-			// TODO - check for and refresh token
 		}
+		// Otherwise directory acquire a token
+	} else {
+		// Get a token based on ...
+		//if s.AzureSubscriptionID == "" && s.AzureTenantID == "" && s.AzureClientID == "" && s.AzureClientSecret == "" {
+
+		// TODO
+		return fmt.Errorf("direct token not yet implemented")
 	}
 
-	// Otherwise check for environmental variables with AD claims and validate
-	// TODO
-
-	return nil
-}
-
-func (s *AzureMonitor) validateResourceID() error {
-	// Was the resource ID manually set?
-	if s.ResourceID != "" {
-		return nil
-	}
-
-	// If the resource ID is empty attempt to use the instance
-	// metadata service
-	if s.instanceMetadata == nil {
-		metadataClient := &AzureInstanceMetadata{}
-		metadata, err := metadataClient.GetInstanceMetadata()
-		if err != nil {
-			// TODO - cannot retrieve metadata and no resource ID specified
-			return err
-		}
-
-		s.ResourceID = metadata.AzureResourceID
-	}
 	return nil
 }
 
@@ -227,7 +269,7 @@ func (s *AzureMonitor) formatField(value interface{}) string {
 
 func (s *AzureMonitor) postData(msg *[]byte) error {
 	metricsEndpoint := fmt.Sprintf("https://%s.monitoring.azure.com/%s/metrics",
-		s.region, s.ResourceID)
+		s.Region, s.ResourceID)
 
 	req, err := http.NewRequest("POST", metricsEndpoint, bytes.NewBuffer(*msg))
 	if err != nil {
@@ -239,7 +281,9 @@ func (s *AzureMonitor) postData(msg *[]byte) error {
 	req.Header.Set("Content-Type", "application/json")
 
 	client := http.Client{
-		Timeout: s.HTTPPostTimeout,
+		// TODO
+		//Timeout: time.Duration(s.HTTPPostTimeout * time.Second),
+		Timeout: time.Duration(10 * time.Second),
 	}
 	resp, err := client.Do(req)
 	if err != nil {

@@ -13,11 +13,23 @@ import (
 type MsiToken struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
-	ExpiresIn    string `json:"expires_in"`
-	ExpiresOn    string `json:"expires_on"`
-	NotBefore    string `json:"not_before"`
+	ExpiresIn    int64  `json:"expires_in"`
+	ExpiresOn    int64  `json:"expires_on"`
+	NotBefore    int64  `json:"not_before"`
 	Resource     string `json:"resource"`
 	TokenType    string `json:"token_type"`
+}
+
+// ExpiresInDuration returns the duration until the token expires
+func (m *MsiToken) ExpiresInDuration() time.Duration {
+	expiresOn := time.Unix(m.ExpiresOn, 0)
+	expiresDuration := time.Now().UTC().Sub(expiresOn)
+	return expiresDuration
+}
+
+// NotBeforeTime returns the time at which the token becomes valid
+func (m *MsiToken) NotBeforeTime() time.Time {
+	return time.Unix(m.NotBefore, 0)
 }
 
 // MsiTokenClient is the client for accessing and validating MSI tokens
@@ -26,6 +38,9 @@ type MsiTokenClient struct {
 
 // GetMsiToken retrieves a managed service identity token from the specified port on the local VM
 func (s *MsiTokenClient) GetMsiToken() (*MsiToken, error) {
+	// Acquire an MSI token.  Documented at:
+	// https://docs.microsoft.com/en-us/azure/active-directory/managed-service-identity/how-to-use-vm-token
+
 	// Create HTTP request for MSI token to access Azure Resource Manager
 	var msiEndpoint *url.URL
 	msiEndpoint, err := url.Parse("http://localhost:50342/oauth2/token")
