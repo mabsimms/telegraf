@@ -32,15 +32,9 @@ func TestPostData(t *testing.T) {
 	metrics := testutil.MockMetrics()
 	metricsList, err := azmon.flattenMetrics(metrics)
 
-	// Check the bearer token
-	t.Logf("Bearer token is |%s|\n", azmon.bearerToken)
-	t.Logf("MSI token is |%#v|\n", azmon.msiToken)
-
-	if err != nil {
-		t.Logf("Error translating metrics %s", err)
-	}
-
 	jsonBytes, err := json.Marshal(&metricsList)
+	t.Logf("json content is:\n%s\n", string(jsonBytes))
+
 	req, err := azmon.postData(&jsonBytes)
 	if err != nil {
 		t.Logf("Error publishing metrics %s", err)
@@ -51,7 +45,7 @@ func TestPostData(t *testing.T) {
 		if err != nil {
 			t.Logf("Request detail is \n%s\n", string(raw))
 		} else { 
-			t.Logf("could not dumpm request: %s\n", err)
+			t.Logf("could not dump request: %s\n", err)
 		}
 	}
 }

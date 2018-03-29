@@ -103,7 +103,7 @@ func (s *AzureMonitor) Connect() error {
 	s.metadataService = &AzureInstanceMetadata{}
 
 	// For the metrics API the MSI resource has to be https://ingestion.monitor.azure.com
-	s.msiResource = "https://ingestion.monitor.azure.com"
+	s.msiResource = "https://ingestion.monitor.azure.com/"
 
 	// Validate the resource identifier
 	if s.ResourceID == "" {
@@ -212,11 +212,11 @@ type azureMonitorBaseData struct {
 }
 
 type azureMonitorSeries struct {
-	DimensionValues []string `json:"dimValues"`
-	Min             string   `json:"min"`
-	Max             string   `json:"max"`
-	Sum             string   `json:"sum"`
-	Count           string   `json:"count"`
+	DimensionValues []string  `json:"dimValues"`
+	Min             int64     `json:"min"`
+	Max             int64     `json:"max"`
+	Sum             int64     `json:"sum"`
+	Count           int64     `json:"count"`
 }
 
 func (s *AzureMonitor) flattenMetrics(metrics []telegraf.Metric) ([]azureMonitorMetric, error) {
@@ -236,19 +236,19 @@ func (s *AzureMonitor) flattenMetrics(metrics []telegraf.Metric) ([]azureMonitor
 		}
 
 		if v, ok := metric.Fields()["min"]; ok {
-			series.Min = s.formatField(v)
+			series.Min = s.formatInt(v)
 		}
 
 		if v, ok := metric.Fields()["max"]; ok {
-			series.Max = s.formatField(v)
+			series.Max = s.formatInt(v)
 		}
 
 		if v, ok := metric.Fields()["sum"]; ok {
-			series.Sum = s.formatField(v)
+			series.Sum = s.formatInt(v)
 		}
 
 		if v, ok := metric.Fields()["count"]; ok {
-			series.Count = s.formatField(v)
+			series.Count = s.formatInt(v)
 		}
 
 		azureMetric := azureMonitorMetric{
@@ -258,6 +258,7 @@ func (s *AzureMonitor) flattenMetrics(metrics []telegraf.Metric) ([]azureMonitor
 					Metric:         metric.Name(),
 					Namespace:      "default",
 					DimensionNames: dimensionNames,
+					Series:         []azureMonitorSeries{series},
 				},
 			},
 		}
@@ -265,6 +266,10 @@ func (s *AzureMonitor) flattenMetrics(metrics []telegraf.Metric) ([]azureMonitor
 		azureMetrics = append(azureMetrics, azureMetric)
 	}
 	return azureMetrics, nil
+}
+
+func (s *AzureMonitor) formatInt(value interface{}) int64 { 
+	return 0
 }
 
 func (s *AzureMonitor) formatField(value interface{}) string {
