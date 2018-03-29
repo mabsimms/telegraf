@@ -1,15 +1,17 @@
 package azuremonitor
 
 import (
-	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetTOKEN(t *testing.T) {
 	tokenService := &MsiTokenClient{}
 	token, err := tokenService.GetMsiToken()
-	if err != nil {
-		t.Logf("could not get token")
-	}
-	fmt.Printf("token is %v\n", token)
+
+	require.NoError(t, err)
+	t.Logf("token is %v\n", token)
+
+	require.NotEmpty(t, token.AccessToken)
 }
