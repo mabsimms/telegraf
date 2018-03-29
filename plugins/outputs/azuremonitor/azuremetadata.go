@@ -56,11 +56,12 @@ type VirtualMachineMetadata struct {
 }
 
 const (
-	url = "http://169.254.169.254/metadata/instance?api-version=2017-12-01"
+	instanceMetadataURL = "http://169.254.169.254/metadata/instance?api-version=2017-12-01"
 )
 
+// GetInstanceMetadata retrieves metadata about the current Azure VM
 func (s *AzureInstanceMetadata) GetInstanceMetadata() (*VirtualMachineMetadata, error) {
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", instanceMetadataURL, nil)
 	if err != nil {
 		log.Errorf("Error creating HTTP request")
 		return nil, err
