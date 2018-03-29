@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"net/http/httputil"
 	"testing"
+	"time"
 
-	"github.com/influxdata/telegraf/testutil"
+	"github.com/influxdata/telegraf"
+	"github.com/influxdata/telegraf/metric"
 )
 
 // func TestDefaultConnectAndWrite(t *testing.T) {
@@ -25,11 +27,44 @@ import (
 // 	require.NoError(t, err)
 // }
 
+// MockMetrics returns a mock []telegraf.Metric object for using in unit tests
+// of telegraf output sinks.
+func getMockMetrics() []telegraf.Metric {
+	metrics := make([]telegraf.Metric, 0)
+	// Create a new point batch
+	metrics = append(metrics, getTestMetric(1.0))
+	return metrics
+}
+
+// TestMetric Returns a simple test point:
+//     measurement -> "test1" or name
+//     tags -> "tag1":"value1"
+//     value -> value
+//     time -> time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
+func getTestMetric(value interface{}, name ...string) telegraf.Metric {
+	if value == nil {
+		panic("Cannot use a nil value")
+	}
+	measurement := "test1"
+	if len(name) > 0 {
+		measurement = name[0]
+	}
+	tags := map[string]string{"tag1": "value1"}
+	pt, _ := metric.New(
+		measurement,
+		tags,
+		map[string]interface{}{"value": value},
+		time.Now().UTC(),
+	)
+	return pt
+}
+
 func TestPostData(t *testing.T) {
 	azmon := &AzureMonitor{}
- 	err := azmon.Connect()
+	err := azmon.Connect()
 
-	metrics := testutil.MockMetrics()
+	metrics := getMockMetrics()
+	t.Logf("mock metrics are %+v\n", metrics)
 	metricsList, err := azmon.flattenMetrics(metrics)
 
 	jsonBytes, err := json.Marshal(&metricsList)
@@ -44,7 +79,7 @@ func TestPostData(t *testing.T) {
 		raw, err := httputil.DumpRequestOut(req, true)
 		if err != nil {
 			t.Logf("Request detail is \n%s\n", string(raw))
-		} else { 
+		} else {
 			t.Logf("could not dump request: %s\n", err)
 		}
 	}
