@@ -10,25 +10,35 @@ import (
 func TestGetMetadata(t *testing.T) {
 	azureMetadata := &AzureInstanceMetadata{}
 	metadata, err := azureMetadata.GetInstanceMetadata()
-	if err != nil {
-		t.Logf("could not get metadata: %v\n", err)
-	} else {
-		t.Logf("resource id  \n%s", metadata.AzureResourceID)
-		t.Logf("metadata is \n%v", metadata)
-	}
+
+	require.NoError(t, err)
+	require.NotNil(t, metadata)
+	require.NotEmpty(t, metadata.AzureResourceID)
+	require.NotEmpty(t, metadata.Compute.Location)
+
+	// if err != nil {
+	// 	t.Logf("could not get metadata: %v\n", err)
+	// } else {
+	// 	t.Logf("resource id  \n%s", metadata.AzureResourceID)
+	// 	t.Logf("metadata is \n%v", metadata)
+	// }
 
 	//fmt.Printf("metadata is \n%v", metadata)
 }
 
 func TestGetTOKEN(t *testing.T) {
 	azureMetadata := &AzureInstanceMetadata{}
-	token, err := azureMetadata.GetMsiToken("", "https://ingestion.monitor.azure.com/")
+
+	resourceID := "https://ingestion.monitor.azure.com/"
+	token, err := azureMetadata.GetMsiToken("", resourceID)
 
 	require.NoError(t, err)
+	require.NotEmpty(t, token.AccessToken)
+	require.EqualValues(t, token.Resource, resourceID)
+
 	t.Logf("token is %+v\n", token)
 	t.Logf("expiry time is %s\n", token.ExpiresAt().Format(time.RFC3339))
 	t.Logf("expiry duration is %s\n", token.ExpiresInDuration().String())
 	t.Logf("resource is %s\n", token.Resource)
 
-	require.NotEmpty(t, token.AccessToken)
 }
