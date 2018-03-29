@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	"github.com/prometheus/common/log"
 )
@@ -68,7 +69,7 @@ func (s *AzureInstanceMetadata) GetInstanceMetadata() (*VirtualMachineMetadata, 
 	}
 	req.Header.Set("Metadata", "true")
 	client := http.Client{
-		Timeout: 15,
+		Timeout: 15 * time.Second,
 	}
 
 	resp, err := client.Do(req)
@@ -92,6 +93,8 @@ func (s *AzureInstanceMetadata) GetInstanceMetadata() (*VirtualMachineMetadata, 
 	if err := json.Unmarshal(reply, &metadata); err != nil {
 		return nil, err
 	}
+	metadata.AzureResourceID = fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s",
+		metadata.Compute.SubscriptionID, metadata.Compute.ResourceGroupName, metadata.Compute.Name)
 
 	return &metadata, nil
 }
