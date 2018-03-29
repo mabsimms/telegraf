@@ -22,7 +22,7 @@ func TestGetMetadata(t *testing.T) {
 
 func TestGetTOKEN(t *testing.T) {
 	azureMetadata := &AzureInstanceMetadata{}
-	token, err := azureMetadata.GetMsiToken("")
+	token, err := azureMetadata.GetMsiToken("", "")
 
 	require.NoError(t, err)
 	t.Logf("token is %v\n", token)

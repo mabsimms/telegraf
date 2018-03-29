@@ -103,7 +103,7 @@ func (m *MsiToken) NotBeforeTime() time.Time {
 }
 
 // GetMsiToken retrieves a managed service identity token from the specified port on the local VM
-func (s *AzureInstanceMetadata) GetMsiToken(clientID string) (*MsiToken, error) {
+func (s *AzureInstanceMetadata) GetMsiToken(clientID string, resourceID string) (*MsiToken, error) {
 	// Acquire an MSI token.  Documented at:
 	// https://docs.microsoft.com/en-us/azure/active-directory/managed-service-identity/how-to-use-vm-token
 	//
@@ -122,6 +122,11 @@ func (s *AzureInstanceMetadata) GetMsiToken(clientID string) (*MsiToken, error) 
 	// Client id is optional
 	if clientID != "" {
 		msiParameters.Add("client_id", clientID)
+	}
+
+	// Resource ID defaults to https://management.azure.com
+	if resourceID == "" {
+		resourceID = "https://management.azure.com"
 	}
 
 	msiEndpoint.RawQuery = msiParameters.Encode()

@@ -30,6 +30,7 @@ type AzureMonitor struct {
 	metadataService  *AzureInstanceMetadata
 	instanceMetadata *VirtualMachineMetadata
 	msiToken         *MsiToken
+	msiResource      string
 	bearerToken      string
 	expiryWatermark  time.Duration
 
@@ -100,6 +101,9 @@ func (s *AzureMonitor) Connect() error {
 
 	s.metadataService = &AzureInstanceMetadata{}
 
+	// For the metrics API the MSI resource has to be https://ingestion.monitor.azure.com
+	s.msiResource = "https://ingestion.monitor.azure.com"
+
 	// Validate the resource identifier
 	if s.ResourceID == "" {
 		metadata, err := s.metadataService.GetInstanceMetadata()
@@ -168,7 +172,7 @@ func (s *AzureMonitor) validateCredentials() error {
 
 		// No token, acquire an MSI token
 		if s.msiToken == nil {
-			msiToken, err := s.metadataService.GetMsiToken(s.AzureClientID)
+			msiToken, err := s.metadataService.GetMsiToken(s.AzureClientID, s.msiResource)
 			if err != nil {
 				return err
 			}
