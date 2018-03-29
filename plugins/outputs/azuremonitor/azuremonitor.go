@@ -17,8 +17,8 @@ import (
 // AzureMonitor allows publishing of metrics to the Azure Monitor custom metrics service
 type AzureMonitor struct {
 	ResourceID       string `json:"resourceId"`
-	HTTPPostTimeout  time.Duration
-	region           string
+	Region           string `json:"region"`
+	HTTPPostTimeout  int    `json:"httpPostTimeout"`
 	instanceMetadata *VirtualMachineMetadata
 	msiToken         *MsiToken
 	msiTokenClient   *MsiTokenClient
@@ -26,7 +26,15 @@ type AzureMonitor struct {
 }
 
 var sampleConfig = `
-## TODO
+## The resource ID against which metric will be logged.  If not
+## specified, the plugin will attempt to retrieve the resource ID
+## of the VM via the instance metadata service (optional if running 
+## on an Azure VM with MSI)
+resourceId = "/subscriptions/3e9c2afc-52b3-4137-9bba-02b6eb204331/resourceGroups/someresourcegroup-rg/providers/Microsoft.Compute/virtualMachines/somevmname"
+## Azure region to publish metrics against.  Defaults to useast
+region = "useast"
+## Maximum duration to wait for HTTP post (in seconds).  Defaults to 15
+httpPostTimeout = 15
 `
 
 // Description provides a description of the plugin
