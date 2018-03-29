@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Azure/go-autorest/autorest/adal"
+	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/influxdata/telegraf"
 )
@@ -30,6 +32,9 @@ type AzureMonitor struct {
 	msiToken         *MsiToken
 	bearerToken      string
 	expiryWatermark  time.Duration
+
+	oauthConfig *adal.OAuthConfig
+	adalToken   adal.OAuthTokenProvider
 }
 
 var sampleConfig = `
@@ -77,6 +82,16 @@ func (s *AzureMonitor) Connect() error {
 		s.useMsi = true
 	} else if s.AzureSubscriptionID == "" || s.AzureTenantID == "" || s.AzureClientID == "" || s.AzureClientSecret == "" {
 		return fmt.Errorf("Must provide values for azureSubscription, azureTenant, azureClient and azureClientSecret, or leave all blank to default to MSI")
+	}
+
+	if s.useMsi == false {
+		// If using direct AD authentication create the AD access client
+		oauthConfig, err = adal.NewOAuthConfig(azure.PublicCloud.ActiveDirectoryEndpoint, s.AzureTenantID)
+		if err != nil {
+			return fmt.Errorf("Could not initialize AD client: %s", err)
+		}
+		s.oauthConfig = oauthConfig
+
 	}
 
 	if s.HTTPPostTimeout == 0 {
@@ -162,11 +177,13 @@ func (s *AzureMonitor) validateCredentials() error {
 		}
 		// Otherwise directory acquire a token
 	} else {
-		// Get a token based on ...
-		//if s.AzureSubscriptionID == "" && s.AzureTenantID == "" && s.AzureClientID == "" && s.AzureClientSecret == "" {
-
-		// TODO
-		return fmt.Errorf("direct token not yet implemented")
+		adToken, err := adal.NewServicePrincipalToken(
+			s.oauthConfig, s.AzureClientID, s.AzureClientSecret,
+			azure.PublicCloud.ActiveDirectoryEndpoint)
+		if err != nil {
+			return fmt.Errorf("Could not acquire ADAL token: %s", err)
+		}
+		s.adalToken = adToken
 	}
 
 	return nil
