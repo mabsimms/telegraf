@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"crypto/tls"
 	"strconv"
 	"time"
 
@@ -302,8 +303,12 @@ func (s *AzureMonitor) postData(msg *[]byte) (*http.Request, error) {
 	req.Header.Set("Authorization", "Bearer: "+s.bearerToken)
 	req.Header.Set("Content-Type", "application/json")
 
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
 	client := http.Client{
-		// TODO
+		Transport: tr,
+		// TODO - fix this
 		//Timeout: time.Duration(s.HTTPPostTimeout * time.Second),
 		Timeout: time.Duration(10 * time.Second),
 	}
