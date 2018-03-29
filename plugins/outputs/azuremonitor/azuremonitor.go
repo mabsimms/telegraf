@@ -21,13 +21,13 @@ type AzureMonitor struct {
 	HTTPPostTimeout     int    `toml:"httpPostTimeout"`
 	AzureSubscriptionID string `toml:"azureSubscription"`
 	AzureTenantID       string `toml:"azureTenant"`
-	AzureClientID       string `toml:"azureClient"`
+	AzureClientID       string `toml:"azureClientId"`
 	AzureClientSecret   string `toml:"azureClientSecret"`
 
 	useMsi           bool
+	metadataService  *AzureInstanceMetadata
 	instanceMetadata *VirtualMachineMetadata
 	msiToken         *MsiToken
-	msiTokenClient   *MsiTokenClient
 	bearerToken      string
 	expiryWatermark  time.Duration
 }
@@ -49,7 +49,7 @@ azureSubscription = "TODO"
 ## TODO 
 azureTenant = "TODO"
 ## TODO
-azureClient = "TODO"
+azureClientId = "TODO"
 ## TODO
 azureClientSecret = "TODO"
 `
@@ -79,15 +79,15 @@ func (s *AzureMonitor) Connect() error {
 		return fmt.Errorf("Must provide values for azureSubscription, azureTenant, azureClient and azureClientSecret, or leave all blank to default to MSI")
 	}
 
-
 	if s.HTTPPostTimeout == 0 {
 		s.HTTPPostTimeout = 10
 	}
 
+	s.metadataService = &AzureInstanceMetadata{}
+
 	// Validate the resource identifier
 	if s.ResourceID == "" {
-		metadataClient := &AzureInstanceMetadata{}
-		metadata, err := metadataClient.GetInstanceMetadata()
+		metadata, err := s.metadataService.GetInstanceMetadata()
 		if err != nil {
 			return fmt.Errorf("No resource id specified, and Azure Instance metadata service not available.  If not running on an Azure VM, provide a value for resourceId")
 		}
@@ -151,13 +151,9 @@ func (s *AzureMonitor) validateCredentials() error {
 			s.msiToken = nil
 		}
 
-		if s.msiTokenClient == nil {
-			s.msiTokenClient = &MsiTokenClient{}
-		}
-
 		// No token, acquire an MSI token
 		if s.msiToken == nil {
-			msiToken, err := s.msiTokenClient.GetMsiToken()
+			msiToken, err := s.metadataService.GetMsiToken(s.AzureClientID)
 			if err != nil {
 				return err
 			}
