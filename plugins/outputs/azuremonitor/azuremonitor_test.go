@@ -2,6 +2,7 @@ package azuremonitor
 
 import (
 	"encoding/json"
+	"net/http/httputil"
 	"testing"
 
 	"github.com/influxdata/telegraf/testutil"
@@ -37,6 +38,11 @@ func TestPostData(t *testing.T) {
 	req, err := azmon.postData(&jsonBytes)
 	if err != nil {
 		t.Logf("Error publishing metrics %s", err)
-		t.Logf("failed request is %#v\n", req)
+		//t.Logf("failed request is %#v\n", req)
+
+		raw, err := httputil.DumpRequest(req, true)
+		if err != nil {
+			t.Logf("Request detail is \n%s\n", raw)
+		}
 	}
 }
