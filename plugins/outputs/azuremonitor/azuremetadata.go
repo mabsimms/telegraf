@@ -122,7 +122,7 @@ func (s *AzureInstanceMetadata) GetMsiToken(clientID string, resourceID string) 
 	}
 
 	msiParameters := url.Values{}
-	msiParameters.Add("resource", "https://management.azure.com/")
+	msiParameters.Add("resource", resourceID)
 	msiParameters.Add("api-version", "2018-02-01")
 
 	// Client id is optional

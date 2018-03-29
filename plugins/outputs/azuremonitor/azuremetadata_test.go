@@ -22,12 +22,13 @@ func TestGetMetadata(t *testing.T) {
 
 func TestGetTOKEN(t *testing.T) {
 	azureMetadata := &AzureInstanceMetadata{}
-	token, err := azureMetadata.GetMsiToken("", "")
+	token, err := azureMetadata.GetMsiToken("", "https://ingestion.monitor.azure.com/")
 
 	require.NoError(t, err)
-	t.Logf("token is %v\n", token)
+	t.Logf("token is %+v\n", token)
 	t.Logf("expiry time is %s\n", token.ExpiresAt().Format(time.RFC3339))
 	t.Logf("expiry duration is %s\n", token.ExpiresInDuration().String())
+	t.Logf("resource is %s\n", token.Resource)
 
 	require.NotEmpty(t, token.AccessToken)
 }

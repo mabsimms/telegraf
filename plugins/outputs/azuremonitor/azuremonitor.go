@@ -147,7 +147,7 @@ func (s *AzureMonitor) Write(metrics []telegraf.Metric) error {
 	}
 
 	jsonBytes, err := json.Marshal(&metricsList)
-	err = s.postData(&jsonBytes)
+	_, err = s.postData(&jsonBytes)
 	if err != nil {
 		log.Printf("Error publishing metrics %s", err)
 		return err
@@ -178,6 +178,7 @@ func (s *AzureMonitor) validateCredentials() error {
 				return err
 			}
 			log.Printf("Bearer token acquired; expiring in %s\n", msiToken.ExpiresInDuration().String())
+			s.msiToken = msiToken
 			s.bearerToken = msiToken.AccessToken
 		}
 		// Otherwise directory acquire a token
@@ -300,7 +301,7 @@ func (s *AzureMonitor) postData(msg *[]byte) (*http.Request, error) {
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", "Bearer: "+s.bearerToken)
+	req.Header.Set("Authorization", "Bearer "+s.bearerToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	tr := &http.Transport{
