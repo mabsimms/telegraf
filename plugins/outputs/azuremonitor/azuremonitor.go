@@ -2,12 +2,12 @@ package azuremonitor
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"crypto/tls"
 	"strconv"
 	"time"
 
@@ -146,11 +146,13 @@ func (s *AzureMonitor) Write(metrics []telegraf.Metric) error {
 		return err
 	}
 
-	jsonBytes, err := json.Marshal(&metricsList)
-	_, err = s.postData(&jsonBytes)
-	if err != nil {
-		log.Printf("Error publishing metrics %s", err)
-		return err
+	for _, v := range metricsList {
+		jsonBytes, err := json.Marshal(&v)
+		_, err = s.postData(&jsonBytes)
+		if err != nil {
+			log.Printf("Error publishing metrics %s", err)
+			return err
+		}
 	}
 
 	return nil
@@ -212,11 +214,11 @@ type azureMonitorBaseData struct {
 }
 
 type azureMonitorSeries struct {
-	DimensionValues []string  `json:"dimValues"`
-	Min             int64     `json:"min"`
-	Max             int64     `json:"max"`
-	Sum             int64     `json:"sum"`
-	Count           int64     `json:"count"`
+	DimensionValues []string `json:"dimValues"`
+	Min             int64    `json:"min"`
+	Max             int64    `json:"max"`
+	Sum             int64    `json:"sum"`
+	Count           int64    `json:"count"`
 }
 
 func (s *AzureMonitor) flattenMetrics(metrics []telegraf.Metric) ([]azureMonitorMetric, error) {
@@ -249,6 +251,9 @@ func (s *AzureMonitor) flattenMetrics(metrics []telegraf.Metric) ([]azureMonitor
 
 		if v, ok := metric.Fields()["count"]; ok {
 			series.Count = s.formatInt(v)
+		} else {
+			// Azure Monitor requires count >= 1
+			series.Count = 1
 		}
 
 		azureMetric := azureMonitorMetric{
@@ -268,7 +273,7 @@ func (s *AzureMonitor) flattenMetrics(metrics []telegraf.Metric) ([]azureMonitor
 	return azureMetrics, nil
 }
 
-func (s *AzureMonitor) formatInt(value interface{}) int64 { 
+func (s *AzureMonitor) formatInt(value interface{}) int64 {
 	return 0
 }
 
