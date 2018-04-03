@@ -146,11 +146,13 @@ func (s *AzureMonitor) Write(metrics []telegraf.Metric) error {
 		return err
 	}
 
-	jsonBytes, err := json.Marshal(&metricsList)
-	_, err = s.postData(&jsonBytes)
-	if err != nil {
-		log.Printf("Error publishing metrics %s", err)
-		return err
+	for _, v := range metricsList {
+		jsonBytes, err := json.Marshal(&v)
+		_, err = s.postData(&jsonBytes)
+		if err != nil {
+			log.Printf("Error publishing metrics %s", err)
+			return err
+		}
 	}
 
 	return nil
@@ -249,6 +251,9 @@ func (s *AzureMonitor) flattenMetrics(metrics []telegraf.Metric) ([]azureMonitor
 
 		if v, ok := metric.Fields()["count"]; ok {
 			series.Count = s.formatInt(v)
+		} else {
+			// Azure Monitor requires count >= 1
+			series.Count = 1
 		}
 
 		azureMetric := azureMonitorMetric{
