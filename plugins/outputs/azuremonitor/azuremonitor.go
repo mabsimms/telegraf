@@ -2,12 +2,12 @@ package azuremonitor
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"crypto/tls"
 	"strconv"
 	"time"
 
@@ -212,11 +212,11 @@ type azureMonitorBaseData struct {
 }
 
 type azureMonitorSeries struct {
-	DimensionValues []string  `json:"dimValues"`
-	Min             int64     `json:"min"`
-	Max             int64     `json:"max"`
-	Sum             int64     `json:"sum"`
-	Count           int64     `json:"count"`
+	DimensionValues []string `json:"dimValues"`
+	Min             int64    `json:"min"`
+	Max             int64    `json:"max"`
+	Sum             int64    `json:"sum"`
+	Count           int64    `json:"count"`
 }
 
 func (s *AzureMonitor) flattenMetrics(metrics []telegraf.Metric) ([]azureMonitorMetric, error) {
@@ -268,7 +268,7 @@ func (s *AzureMonitor) flattenMetrics(metrics []telegraf.Metric) ([]azureMonitor
 	return azureMetrics, nil
 }
 
-func (s *AzureMonitor) formatInt(value interface{}) int64 { 
+func (s *AzureMonitor) formatInt(value interface{}) int64 {
 	return 0
 }
 
