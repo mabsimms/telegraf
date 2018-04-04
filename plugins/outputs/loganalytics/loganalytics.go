@@ -67,7 +67,8 @@ func (s *LogAnalytics) Connect() error {
 	}
 
 	if s.LogName == "" {
-		return fmt.Errorf("Log analytics log name not defined")
+		log.Printf("Log name not defined; defaulting to metrics")
+		s.LogName = "metrics"
 	}
 
 	s.URL = "https://" + s.Workspace + ".ods.opinsights.azure.com" + resource + "?api-version=2016-04-01"
